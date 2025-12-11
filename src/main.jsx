@@ -8,7 +8,7 @@ import App from "./App.jsx";
 import "bootstrap/dist/js/bootstrap.bundle.min.js";
 
 import "./index.css";
-import "./app.css";
+import "./App.css";
 import { initThemeFromStorage } from "./utils/theme";
 
 initThemeFromStorage();
@@ -19,3 +19,4 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     </BrowserRouter>
   </React.StrictMode>
 );
+
