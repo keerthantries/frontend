@@ -29,6 +29,7 @@ import BatchDetailPage from "./features/batches/pages/BatchDetailsPage.jsx";
 
 import ProtectedRoute from "./features/auth/components/ProtectedRoute.jsx";
 
+import ErrorPage404 from "./features/errors/ErrorPage404.jsx";
 function App() {
   return (
     <Routes>
@@ -79,14 +80,15 @@ function App() {
           <Route path="batches" element={<BatchesListPage />} />
           <Route path="batches/add" element={<AddBatchPage />} />
           <Route path="batches/:id" element={<BatchDetailPage />} />
-
+          
         </Route>
       </Route>
 
       {/* 404 */}
-      <Route path="*" element={<div>404 - Page not found</div>} />
+      <Route path="*" element={<ErrorPage404/>} />
     </Routes>
   );
 }
 
 export default App;
+
