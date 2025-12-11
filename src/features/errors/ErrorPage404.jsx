@@ -1,8 +1,7 @@
 import React from "react";
 
 const PageUnderConstruction = () => {
-  const robotIllustrationUrl = "src/assets/errorpage.images/ErrorPageImage.svg";
-  const toolboxIllustrationUrl = "src/assets/errorpage.images/ui_toolbox.svg";
+  const robotIllustrationUrl = "https://previews.123rf.com/images/jakarin2521/jakarin25211804/jakarin2521180400005/98543408-concept-of-under-construction-website-graphic-of-construction-site-with-industrial-crane.avif";
 
   return (
     <main className="nk-wrap bg-light min-vh-100 d-flex align-items-center">
@@ -53,15 +52,7 @@ const PageUnderConstruction = () => {
                     className="position-relative mx-auto"
                     style={{ maxWidth: "320px", height: "120px" }}
                   >
-                    {/* Toolbox illustration in the center */}
-                    <div className="position-absolute start-50 translate-middle-x bottom-0 text-center">
-                      <img
-                        src={toolboxIllustrationUrl}
-                        alt="UI toolbox"
-                        className="img-fluid"
-                        style={{ maxWidth: "110px" }}
-                      />
-                    </div>
+
 
                     {/* Spilled UI chips */}
                     <div
@@ -160,3 +151,4 @@ const PageUnderConstruction = () => {
 };
 
 export default PageUnderConstruction;
+
