@@ -1,0 +1,469 @@
+/* ================================
+   Vidhyapat Admin - Global Theme
+   ================================ */
+
+/* Base CSS variables */
+:root {
+  --vp-primary: #0a0475;
+  --vp-secondary: #108fff;
+  --vp-bg: #f5f6fa;
+  --vp-bg-dark: #020617;
+  --vp-text: #0f172a;
+  --vp-text-muted: #64748b;
+  --font-base: system-ui, -apple-system, BlinkMacSystemFont, "Inter",
+    "Segoe UI", sans-serif;
+}
+
+/* Light theme mapping (Bootstrap + template) */
+:root,
+[data-bs-theme="light"] {
+  color-scheme: light;
+
+  --bs-body-bg: var(--vp-bg);
+  --bs-body-color: var(--vp-text);
+
+  --bs-primary: var(--vp-primary);
+  --bs-primary-rgb: 10, 4, 117;
+  --bs-secondary: var(--vp-secondary);
+  --bs-secondary-rgb: 16, 143, 255;
+
+  --bs-link-color: var(--vp-primary);
+  --bs-link-hover-color: var(--vp-secondary);
+
+  --bs-border-color: #e2e8f0;
+  --bs-heading-color: #020617;
+}
+
+/* Dark theme mapping */
+[data-bs-theme="dark"] {
+  color-scheme: dark;
+
+  --bs-body-bg: var(--vp-bg-dark);
+  --bs-body-color: #e5e7eb;
+
+  --bs-primary: var(--vp-primary);
+  --bs-primary-rgb: 129, 140, 248;
+  --bs-secondary: var(--vp-secondary);
+  --bs-secondary-rgb: 56, 189, 248;
+
+  --bs-link-color: #93c5fd;
+  --bs-link-hover-color: #bfdbfe;
+
+  --bs-border-color: #1e293b;
+  --bs-heading-color: #f9fafb;
+}
+
+/* Global body styling */
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-base);
+  background-color: var(--bs-body-bg);
+  color: var(--bs-body-color);
+}
+
+/* Utility: smooth transitions for theme changes */
+body,
+.nk-main,
+.nk-wrap,
+.nk-content,
+.nk-sidebar,
+.nk-header {
+  transition: background-color 0.2s ease, color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+/* ================================
+   Icon & Common UI Helpers
+   ================================ */
+
+/* Base Lucide icon style */
+.vp-icon {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.9;
+  display: inline-block;
+}
+
+/* Search input refinements */
+.vp-search-input {
+  background-color: transparent;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.vp-search-input:focus {
+  background-color: rgba(148, 163, 184, 0.08);
+  box-shadow: none;
+}
+
+/* Theme toggle button */
+.vp-theme-toggle {
+  border-radius: 999px;
+  transition: background-color 0.18s ease, color 0.18s ease,
+    border-color 0.18s ease, box-shadow 0.15s ease;
+}
+
+.vp-theme-toggle:hover {
+  background-color: rgba(148, 163, 184, 0.15);
+  border-color: transparent;
+}
+
+/* Quick icon buttons (header: chat, bell, language, etc.) */
+.vp-quick-icon-btn .quick-icon,
+.vp-quick-icon-btn .icon-status {
+  border-radius: 999px;
+  transition: background-color 0.18s ease, transform 0.12s ease;
+}
+
+.vp-quick-icon-btn:hover .quick-icon,
+.vp-quick-icon-btn:hover .icon-status {
+  background-color: rgba(148, 163, 184, 0.16);
+  transform: translateY(-1px);
+}
+
+/* Dropdown styling */
+.dropdown-menu {
+  border-radius: 0.75rem;
+  border: 1px solid var(--bs-border-color);
+}
+
+/* ================================
+   Sidebar - VP Enhancements ONLY
+   (we do NOT change layout here)
+   ================================ */
+
+/* Parent items that have submenu */
+.vp-menu-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-inline: 1rem;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+/* Make menu text take remaining space */
+.vp-menu-toggle .nk-menu-text {
+  flex: 1;
+}
+
+/* Hover effect for items with submenus */
+.vp-menu-toggle:hover {
+  background-color: rgba(148, 163, 184, 0.12);
+}
+
+/* Chevron icon at right of parent menu */
+.vp-menu-chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease, opacity 0.18s ease;
+  opacity: 0.7;
+}
+
+.vp-menu-toggle:hover .vp-menu-chevron {
+  opacity: 1;
+}
+
+/* Rotate chevron when submenu open */
+.vp-menu-chevron.open {
+  transform: rotate(90deg);
+}
+
+/* Active parent highlight (submenus) */
+.nk-menu-item.has-sub.active > .vp-menu-toggle {
+  border-left: 3px solid var(--vp-primary);
+  background-color: rgba(15, 23, 42, 0.04);
+}
+
+/* Adjust for dark theme */
+[data-bs-theme="dark"] .nk-menu-item.has-sub.active > .vp-menu-toggle {
+  background-color: rgba(148, 163, 184, 0.12);
+}
+
+/* Optional: child active link bold text */
+.nk-menu-sub .nk-menu-link.active .nk-menu-text {
+  font-weight: 600;
+}
+
+/* ================================
+   Header - VP Enhancements ONLY
+   ================================ */
+
+/* User avatar */
+.user-avatar {
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+/* Slightly softer header background if needed
+   (DashLite already sets a header bg, so keep subtle) */
+.nk-header {
+  backdrop-filter: blur(8px);
+}
+
+/* ================================
+   Mobile Sidebar Overlay
+   (we do not change sidebar position/layout)
+   ================================ */
+
+.nk-sidebar-overlay,
+.vp-sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  z-index: 1020;
+}
+
+/* Only show overlay on small screens; DashLite handles desktop layout */
+@media (min-width: 1200px) {
+  .nk-sidebar-overlay,
+  .vp-sidebar-overlay {
+    display: none;
+  }
+}
+/* Clean borderless sidebar toggle buttons */
+.nk-menu-btn {
+  background: transparent;
+  border: none;
+  padding: 6px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--vp-text);
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.12s ease;
+}
+
+/* Hover effect */
+.nk-menu-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
+}
+
+/* Dark mode hover */
+[data-bs-theme="dark"] .nk-menu-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Prevent extra bootstrap styles */
+.nk-menu-btn:focus,
+.nk-menu-btn:active {
+  box-shadow: none !important;
+  outline: none !important;
+  transform: none !important;
+}
+/* ///////////// dashboard/////////////////// */
+/* ================================
+   Sub-Org pages – premium styling
+   ================================ */
+
+/* =======================
+   Sub-Org list styling
+   ======================= */
+
+/* header buttons */
+.vp-suborg-header-btn,
+.vp-suborg-header-btn-primary {
+  border-radius: 999px;
+  padding-inline: 1.1rem;
+  padding-block: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.vp-suborg-header-btn-primary {
+  box-shadow: 0 10px 30px rgba(37, 99, 235, 0.35);
+}
+
+/* filter card */
+.vp-suborg-filter-card {
+  border-radius: 999px;
+  background: linear-gradient(
+    135deg,
+    rgba(59, 130, 246, 0.05),
+    rgba(129, 140, 248, 0.04)
+  );
+  border-color: rgba(148, 163, 184, 0.25);
+}
+
+[data-bs-theme="dark"] .vp-suborg-filter-card {
+  background: rgba(15, 23, 42, 0.95);
+  border-color: rgba(148, 163, 184, 0.45);
+}
+
+/* filter icon pill */
+.vp-filter-icon-wrap {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--vp-primary, var(--bs-primary));
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+}
+
+/* search input with icon */
+.vp-filter-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0.65;
+}
+
+.vp-filter-search-input {
+  padding-left: 36px;
+  border-radius: 999px;
+}
+
+/* status select */
+.vp-filter-select {
+  border-radius: 999px;
+}
+
+/* table card */
+.vp-suborg-card {
+  border-radius: 1.1rem;
+  background: var(--vp-surface, var(--bs-body-bg));
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.05);
+}
+
+/* clickable rows */
+.nk-tb-row-clickable {
+  cursor: pointer;
+  border-radius: 14px;
+  margin-bottom: 4px;
+}
+
+.nk-tb-row-clickable:hover {
+  background: rgba(59, 130, 246, 0.03);
+  box-shadow: 0 16px 45px rgba(15, 23, 42, 0.06);
+}
+
+/* action column fixed width */
+.vp-suborg-actions-col {
+  flex: 0 0 130px;
+  max-width: 130px;
+  text-align: right;
+}
+
+/* action buttons */
+.vp-action-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background: rgba(148, 163, 184, 0.08);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: #0f172a;
+  transition: background-color 0.15s ease, border-color 0.15s ease,
+    transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+.vp-action-btn svg {
+  display: block;
+}
+
+.vp-action-btn:hover {
+  background: #ffffff;
+  border-color: rgba(59, 130, 246, 0.8);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.15);
+  transform: translateY(-1px);
+}
+
+[data-bs-theme="dark"] .vp-action-btn {
+  background: rgba(15, 23, 42, 0.9);
+  border-color: rgba(148, 163, 184, 0.6);
+  color: #e5e7eb;
+}
+
+[data-bs-theme="dark"] .vp-action-btn:hover {
+  background: rgba(30, 64, 175, 0.9);
+  border-color: rgba(129, 140, 248, 0.9);
+}
+/* ========= Sub-org actions 3-dots menu ========= */
+
+/* fix width of actions column so it doesn't overlap Created */
+.vp-suborg-actions-col {
+  flex: 0 0 70px;
+  max-width: 70px;
+  text-align: right;
+}
+
+/* 3-dots button */
+.vp-kebab-btn {
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.12);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #0f172a;
+  transition: background-color 0.15s ease, border-color 0.15s ease,
+    box-shadow 0.15s ease, transform 0.1s ease;
+}
+
+.vp-kebab-btn:hover {
+  background: #ffffff;
+  border-color: var(--bs-primary);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.15);
+  transform: translateY(-1px);
+}
+
+/* dropdown menu – premium look */
+.vp-actions-menu {
+  min-width: 190px;
+  border-radius: 0.85rem;
+  padding: 6px 0;
+  box-shadow: 0 12px 35px rgba(15, 23, 42, 0.15);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+/* open on hover as well (Bootstrap will still work on click) */
+.dropdown.vp-actions:hover > .vp-actions-menu {
+  display: block;
+  opacity: 1;
+}
+
+/* dropdown items */
+.vp-actions-menu .dropdown-item {
+  font-size: 0.86rem;
+  padding: 0.45rem 0.9rem;
+}
+
+.vp-actions-menu .dropdown-item svg {
+  flex-shrink: 0;
+}
+
+.vp-actions-menu .dropdown-item:hover {
+  background: rgba(59, 130, 246, 0.08);
+  color: #2563eb;
+}
+
+/* dark mode support */
+[data-bs-theme="dark"] .vp-kebab-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(148, 163, 184, 0.5);
+  color: #e5e7eb;
+}
+
+[data-bs-theme="dark"] .vp-actions-menu {
+  background: #0f172a;
+  border-color: rgba(148, 163, 184, 0.35);
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.55);
+}
+
+[data-bs-theme="dark"] .vp-actions-menu .dropdown-item:hover {
+  background: rgba(37, 99, 235, 0.45);
+  color: #e5e7eb;
+}
+
+/* =======================
+   Sub-Org detail styling
+   ======================= */
