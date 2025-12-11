@@ -13,7 +13,9 @@ export default defineConfig({
     // Allow your Render hostname(s)
     allowedHosts: [
       'frontend-ljg7.onrender.com',
+      'admin.vidhyapat.com',
       // add any other domains you will use (custom domain, etc.)
     ],
   },
 })
+
