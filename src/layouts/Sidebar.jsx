@@ -205,6 +205,7 @@ const Sidebar = ({ isOpen, onToggleMenu }) => {
               </li>
 
               {/* ===== User Management ===== */}
+              {/* ===== User Management ===== */}
               <li className={`nk-menu-item has-sub ${open.user ? "active" : ""}`}>
                 <a
                   href="#"
@@ -218,9 +219,7 @@ const Sidebar = ({ isOpen, onToggleMenu }) => {
                     <Users className="vp-icon" />
                   </span>
                   <span className="nk-menu-text">User Management</span>
-                  <span
-                    className={`vp-menu-chevron ${open.user ? "open" : ""}`}
-                  >
+                  <span className={`vp-menu-chevron ${open.user ? "open" : ""}`}>
                     <ChevronRight size={16} />
                   </span>
                 </a>
@@ -250,6 +249,17 @@ const Sidebar = ({ isOpen, onToggleMenu }) => {
 
                   <li className="nk-menu-item">
                     <NavLink
+                      to="/admin/suborg-admins"
+                      className={({ isActive }) =>
+                        `nk-menu-link ${isActive ? "active" : ""}`
+                      }
+                    >
+                      <ShieldCheck className="vp-icon me-2" /> Sub-Org Admins
+                    </NavLink>
+                  </li>
+
+                  <li className="nk-menu-item">
+                    <NavLink
                       to="/admin/learners"
                       className={({ isActive }) =>
                         `nk-menu-link ${isActive ? "active" : ""}`
@@ -260,6 +270,7 @@ const Sidebar = ({ isOpen, onToggleMenu }) => {
                   </li>
                 </ul>
               </li>
+
 
               {/* ===== Courses (SEPARATE SECTION) ===== */}
               <li
@@ -356,8 +367,7 @@ const Sidebar = ({ isOpen, onToggleMenu }) => {
 
               {/* ===== Enrolment ===== */}
               <li
-                className={`nk-menu-item has-sub ${open.enrolment ? "active" : ""
-                  }`}
+                className={`nk-menu-item has-sub ${open.enrolment ? "active" : ""}`}
               >
                 <a
                   href="#"
@@ -372,17 +382,13 @@ const Sidebar = ({ isOpen, onToggleMenu }) => {
                   </span>
                   <span className="nk-menu-text">Enrollment</span>
                   <span
-                    className={`vp-menu-chevron ${open.enrolment ? "open" : ""
-                      }`}
+                    className={`vp-menu-chevron ${open.enrolment ? "open" : ""}`}
                   >
                     <ChevronRight size={16} />
                   </span>
                 </a>
 
-                <ul
-                  className="nk-menu-sub"
-                  style={submenuStyle(open.enrolment)}
-                >
+                <ul className="nk-menu-sub" style={submenuStyle(open.enrolment)}>
                   <li className="nk-menu-item">
                     <NavLink
                       to="/admin/enrolments"
@@ -408,6 +414,7 @@ const Sidebar = ({ isOpen, onToggleMenu }) => {
                   </li>
                 </ul>
               </li>
+
 
               {/* ===== Certificates ===== */}
               <li

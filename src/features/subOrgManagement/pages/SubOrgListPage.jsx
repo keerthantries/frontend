@@ -178,19 +178,27 @@ const SubOrgListPage = () => {
 
               {/* Search */}
               <div className="col-12 col-md-5">
-                <div className="position-relative">
-                  <span className="vp-filter-search-icon">
-                    <Search size={16} />
-                  </span>
-                  <input
-                    type="text"
-                    className="form-control vp-filter-search-input"
-                    placeholder="Search sub-org by name or code..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                </div>
-              </div>
+  <div className="position-relative">
+
+    {/* Search Icon */}
+    <span
+      className="position-absolute top-50 start-0 translate-middle-y ps-3 text-muted"
+    >
+      <Search size={16} />
+    </span>
+
+    {/* Search Input */}
+    <input
+      type="text"
+      className="form-control ps-5"  // ps-5 adds space between icon & placeholder
+      placeholder="Search sub-org by name or code..."
+      value={search}
+      onChange={(e) => setSearch(e.target.value)}
+    />
+
+  </div>
+</div>
+
 
               {/* Status */}
               <div className="col-12 col-md-3">

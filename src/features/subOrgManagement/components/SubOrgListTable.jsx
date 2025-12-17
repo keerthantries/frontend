@@ -47,27 +47,35 @@ const SubOrgListTable = ({
     <div className="nk-tb-list nk-tb-ulist">
       {/* HEADER */}
       <div className="nk-tb-item nk-tb-head">
-        <div className="nk-tb-col">
-          <span className="sub-text">Name</span>
-        </div>
-        <div className="nk-tb-col tb-col-md">
-          <span className="sub-text">Code</span>
-        </div>
-        <div className="nk-tb-col tb-col-md">
-          <span className="sub-text">Status</span>
-        </div>
-        <div className="nk-tb-col tb-col-md">
-          <span className="sub-text">Users</span>
-        </div>
-        <div className="nk-tb-col tb-col-md">
-          <span className="sub-text">Created</span>
-        </div>
-        {canManage && (
-          <div className="nk-tb-col nk-tb-col-tools vp-suborg-actions-col text-end">
-            <span className="sub-text">Actions</span>
-          </div>
-        )}
-      </div>
+  <div className="nk-tb-col">
+    <span className="sub-text">Name</span>
+  </div>
+
+  <div className="nk-tb-col tb-col-md">
+    <span className="sub-text">Code</span>
+  </div>
+
+  <div className="nk-tb-col tb-col-md">
+    <span className="sub-text">Status</span>
+  </div>
+
+  <div className="nk-tb-col tb-col-md">
+    <span className="sub-text">Users</span>
+  </div>
+
+  <div className="nk-tb-col tb-col-md">
+    <span className="sub-text">Created</span>
+  </div>
+
+  {canManage && (
+    <div className="nk-tb-col nk-tb-col-tools vp-suborg-actions-col text-end">
+      <span className="sub-text">Actions</span>
+    </div>
+  )}
+</div>
+
+
+
 
       {/* ROWS */}
       {subOrgs.map((subOrg) => (
@@ -77,23 +85,25 @@ const SubOrgListTable = ({
           onClick={() => onRowClick && onRowClick(subOrg)}
         >
           {/* Name */}
-          <div className="nk-tb-col">
+      
+          <div className="nk-tb-col d-flex align-items-center">
             <div className="user-card">
               <div className="user-info">
-                <span className="tb-lead d-flex align-items-center gap-1">
+
+                {/* Sub-org name aligned & balanced */}
+                <span className="d-flex align-items-center gap-2 fw-medium fs-9 lh-sm mb-0">
                   {subOrg.name}
+
+                  {/* Active status dot */}
                   {subOrg.status === "active" && (
                     <span className="dot dot-success" />
                   )}
                 </span>
-                {subOrg.description && (
-                  <span className="sub-text text-soft">
-                    {subOrg.description}
-                  </span>
-                )}
+
               </div>
             </div>
           </div>
+
 
           {/* Code */}
           <div className="nk-tb-col tb-col-md">

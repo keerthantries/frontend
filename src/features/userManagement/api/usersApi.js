@@ -1,37 +1,35 @@
+// src/features/userManagement/api/usersApi.js
 import httpClient from "../../../services/httpClient";
 
 /**
- * Fetch users with pagination, search, sorting and optional role filter.
- * Backend should handle q, role, sortBy, sortDir.
+ * Fetch users with pagination, search, sorting and optional filters.
+ * Backend supports: q, role, status, subOrgId, unassignedOnly, page, limit.
  */
-// export async function fetchUsers({ page = 1, limit = 20 } = {}) {
-//   const response = await httpClient.get("/api/admin/users", {
-//     params: { page, limit },
-//   });
-
-//   console.log("🔎 Raw /api/admin/users response:", response);
-
-//   // return only data (whatever it is)
-//   return response.data;
 export async function fetchUsers({
   page = 1,
   limit = 20,
   q = "",
   role,
+  status,
   sortBy,
   sortDir,
+  subOrgId,
+  unassignedOnly,
 } = {}) {
   const params = { page, limit };
 
   if (q && q.trim()) params.q = q.trim();
   if (role) params.role = role;
+  if (status) params.status = status;
   if (sortBy) params.sortBy = sortBy;
   if (sortDir) params.sortDir = sortDir;
+  if (subOrgId) params.subOrgId = subOrgId; // 🔹 important
+  if (unassignedOnly) params.unassignedOnly = "true";
 
   const res = await httpClient.get("/api/admin/users", { params });
   const data = res.data;
 
-  // Normalise shapes
+  // Normalize into { items, pagination } for the UI
   if (data?.data?.items) {
     return {
       items: data.data.items,

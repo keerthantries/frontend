@@ -55,7 +55,9 @@ const UserTransferPage = () => {
         console.error("Failed to load user:", err);
         if (!isMounted) return;
         setError(
-          err?.message || "Failed to load user details. Please try again."
+          err?.response?.data?.message ||
+          err?.message ||
+          "Failed to load user details. Please try again."
         );
       } finally {
         if (isMounted) setLoadingUser(false);
@@ -76,7 +78,17 @@ const UserTransferPage = () => {
       setLoadingSubOrgs(true);
       try {
         const res = await fetchSubOrgs();
-        const list = res?.data?.data || res?.data || [];
+        // supports shapes: {success, data: []}, {data: []}, []
+        let list = [];
+
+        if (Array.isArray(res?.data?.data)) {
+          list = res.data.data;
+        } else if (Array.isArray(res?.data)) {
+          list = res.data;
+        } else if (Array.isArray(res)) {
+          list = res;
+        }
+
         if (!isMounted) return;
         setSubOrgs(list);
       } catch (err) {
@@ -104,7 +116,6 @@ const UserTransferPage = () => {
       // Empty string → main org (no sub-org)
       const finalSubOrgId = targetSubOrgId || null;
 
-      // ✅ This is where undefined was going earlier if userId was wrong
       await transferUserSubOrg(userId, finalSubOrgId);
 
       navigate("/admin/users");
@@ -120,12 +131,27 @@ const UserTransferPage = () => {
     }
   };
 
-  const currentSubOrgName =
+  // ---------- Derive current org name (never show ID) ----------
+  let currentSubOrgName = "Main Org";
+  const rawCurrentSubOrgId = user?.subOrgId || user?.orgId || "";
+
+  if (
     user?.subOrgName ||
     user?.orgName ||
-    user?.organizationName ||
-    user?.subOrgId ||
-    "Main Org";
+    user?.organizationName
+  ) {
+    currentSubOrgName =
+      user.subOrgName || user.orgName || user.organizationName;
+  } else if (rawCurrentSubOrgId && subOrgs.length > 0) {
+    const match = subOrgs.find(
+      (s) =>
+        String(s.id || s._id) === String(rawCurrentSubOrgId)
+    );
+    if (match) {
+      currentSubOrgName =
+        match.name || match.code || "Sub-Organization";
+    }
+  }
 
   if (loadingUser && !user) {
     return (
@@ -137,7 +163,7 @@ const UserTransferPage = () => {
   }
 
   if (!user && error) {
-    return <p className="text-danger">{error}</p>;
+    return <p className="text-danger m-3">{error}</p>;
   }
 
   if (!user) return null;
@@ -159,7 +185,7 @@ const UserTransferPage = () => {
             <div className="d-flex align-items-center gap-2 mb-1">
               <button
                 type="button"
-                className="btn btn-sm btn-outline-light border-0 p-1 me-1"
+                className="btn btn-sm btn-outline-light border-0 p-1"
                 onClick={() => navigate(-1)}
                 title="Back"
               >
@@ -184,7 +210,6 @@ const UserTransferPage = () => {
       <div className="nk-block">
         <div className="card card-bordered card-stretch">
           <div className="card-inner">
-
             {error && (
               <div className="alert alert-danger mb-3" role="alert">
                 {error}
@@ -258,12 +283,17 @@ const UserTransferPage = () => {
                         <option value="">
                           Main Organization (no sub-org)
                         </option>
-                        {subOrgs.map((s) => (
-                          <option key={s.id || s._id} value={s.id || s._id}>
-                            {s.name}
-                            {s.code ? ` (${s.code})` : ""}
-                          </option>
-                        ))}
+                        {subOrgs.map((s) => {
+                          const id = s.id || s._id;
+                          const labelName =
+                            s.name || s.subOrgName || s.displayName || "Sub-Org";
+                          return (
+                            <option key={id} value={id}>
+                              {labelName}
+                              {s.code ? ` (${s.code})` : ""}
+                            </option>
+                          );
+                        })}
                       </select>
                     </div>
                     <div className="form-note">
@@ -273,24 +303,30 @@ const UserTransferPage = () => {
                 </div>
 
                 <div className="col-md-5">
-                  <div className="d-flex justify-content-end gap-2">
+                  <div className="d-flex justify-content-end gap-3">
+
+                   
                     <button
                       type="button"
-                      className="btn btn-outline-light"
+                      className="btn btn-outline-secondary px-4 py-2"
                       onClick={() => navigate(-1)}
                       disabled={saving}
                     >
                       Cancel
                     </button>
+
+                   
                     <button
                       type="submit"
-                      className="btn btn-primary"
+                      className="btn btn-primary px-4 py-2"
                       disabled={saving}
                     >
                       {saving ? "Transferring..." : "Confirm Transfer"}
                     </button>
+
                   </div>
                 </div>
+
               </div>
             </form>
 

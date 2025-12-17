@@ -21,22 +21,23 @@ import {
   CalendarClock,
   Activity,
 } from "lucide-react";
+import { fetchSubOrgs } from "../../subOrgManagement/api/suborgApi"; 
 
 const UserDetailsPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  // ===== Current logged-in user (from localStorage) =====
+  // current logged-in user
   let currentUser = null;
   try {
     const raw = localStorage.getItem("vp_user");
     currentUser = raw ? JSON.parse(raw) : null;
-  } catch (e) {
+  } catch {
     currentUser = null;
   }
 
   const currentRole = currentUser?.role;
-  const isAdmin = currentRole === "admin"; // keep as-is for Transfer Sub-Org (Admin only)
+  const isAdmin = currentRole === "admin";
   const canVerifyEducator =
     currentRole === "admin" || currentRole === "subOrgAdmin";
 
@@ -44,6 +45,9 @@ const UserDetailsPage = () => {
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // sub-org mapping (id → name) so details page never shows raw IDs
+  const [subOrgMap, setSubOrgMap] = useState({});
 
   useEffect(() => {
     let isMounted = true;
@@ -59,7 +63,9 @@ const UserDetailsPage = () => {
         console.error("Error fetching user details:", err);
         if (!isMounted) return;
         setError(
-          err?.message || "Failed to load user details. Please try again."
+          err?.response?.data?.message ||
+            err?.message ||
+            "Failed to load user details. Please try again."
         );
       } finally {
         if (isMounted) setLoading(false);
@@ -71,6 +77,43 @@ const UserDetailsPage = () => {
       isMounted = false;
     };
   }, [id]);
+
+  // Load sub-org list once so we can resolve IDs → names
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadSubOrgs() {
+      try {
+        const res = await fetchSubOrgs();
+        const data = res?.data;
+
+        let items = [];
+        if (Array.isArray(data)) items = data;
+        else if (Array.isArray(data?.items)) items = data.items;
+        else if (Array.isArray(data?.data?.items)) items = data.data.items;
+        else if (Array.isArray(data?.data)) items = data.data;
+
+        const map = {};
+        (items || []).forEach((so) => {
+          const sid = so.id || so._id;
+          if (!sid) return;
+          const name =
+            so.name || so.subOrgName || so.displayName || `Sub-Org #${sid}`;
+          map[String(sid)] = name;
+        });
+
+        if (isMounted) setSubOrgMap(map);
+      } catch (err) {
+        // non-blocking – just log
+        console.warn("Failed to load sub-orgs for details page:", err);
+      }
+    }
+
+    loadSubOrgs();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const formatDate = (value) => {
     if (!value) return "-";
@@ -87,6 +130,35 @@ const UserDetailsPage = () => {
     if (["blocked", "suspend", "suspended"].includes(s))
       return "badge bg-danger-dim text-danger";
     return "badge bg-light text-muted";
+  };
+
+  const getOrganizationName = () => {
+    if (!user) return "Main Org";
+
+    // direct names from user
+    const direct =
+      user.subOrgName ||
+      user.orgName ||
+      user.organizationName ||
+      user.org?.name ||
+      user.subOrg?.name;
+
+    if (direct) return direct;
+
+    // lookup by id
+    const possibleId =
+      user.subOrgId ||
+      user.suborgId ||
+      user.orgId ||
+      user.organizationId ||
+      user.subOrg?._id ||
+      user.subOrg?.id;
+
+    if (possibleId && subOrgMap[String(possibleId)]) {
+      return subOrgMap[String(possibleId)];
+    }
+
+    return "Main Org";
   };
 
   const handleDelete = async () => {
@@ -118,7 +190,7 @@ const UserDetailsPage = () => {
     setError("");
     try {
       await updateUserStatus(id, nextStatus);
-      setUser((prev) => ({ ...prev, status: nextStatus }));
+      setUser((prev) => (prev ? { ...prev, status: nextStatus } : prev));
     } catch (err) {
       console.error("Update status error:", err);
       const message =
@@ -131,17 +203,36 @@ const UserDetailsPage = () => {
     }
   };
 
-  if (loading) {
+  // ===== Loading / error states in full-page style =====
+  if (loading && !user) {
     return (
-      <div className="text-center py-5">
-        <div className="spinner-border text-primary"></div>
-        <div className="text-soft mt-2 small">Loading user...</div>
+      <div className="nk-block">
+        <div className="text-center py-5">
+          <div className="spinner-border text-primary" />
+          <div className="text-soft mt-2 small">
+            Loading user details...
+          </div>
+        </div>
       </div>
     );
   }
 
   if (error && !user) {
-    return <p className="text-danger">{error}</p>;
+    return (
+      <div className="nk-block">
+        <div className="alert alert-danger" role="alert">
+          {error}
+        </div>
+        <button
+          type="button"
+          className="btn btn-outline-secondary btn-sm mt-2"
+          onClick={() => navigate(-1)}
+        >
+          <ArrowLeft size={16} className="me-1" />
+          Back
+        </button>
+      </div>
+    );
   }
 
   if (!user) return null;
@@ -154,65 +245,54 @@ const UserDetailsPage = () => {
       .slice(0, 2)
       .toUpperCase() || "U";
 
-  const organizationName =
-    user.orgName ||
-    user.organizationName ||
-    user.subOrgName ||
-    user.subOrgId ||
-    "Main Org";
-
+  const organizationName = getOrganizationName();
   const isActive = (user.status || "").toLowerCase() === "active";
   const isEducator =
     (user.role || user.userRole || "").toLowerCase() === "educator";
 
   return (
     <>
-      {/* PAGE HEAD */}
+      {/* PAGE HEADER */}
       <div className="nk-block-head nk-block-head-sm">
         <div className="nk-block-between">
           <div className="nk-block-head-content">
-            <div className="d-flex align-items-center gap-2 mb-1">
+            <h3 className="nk-block-title page-title">
               <button
                 type="button"
-                className="btn btn-sm btn-outline-light border-0 p-1 me-1"
+                className="btn btn-sm btn-outline-light me-2"
                 onClick={() => navigate(-1)}
-                title="Back"
               >
-                <ArrowLeft size={18} />
+                <ArrowLeft size={16} className="me-1" />
+                Back
               </button>
-              <h3 className="nk-block-title page-title mb-0">
-                User /{" "}
-                <strong className="text-primary small">
-                  {user.name || "User"}
-                </strong>
-              </h3>
-            </div>
+              User /{" "}
+              <strong className="text-primary small">
+                {user.name || "User"}
+              </strong>
+            </h3>
             <div className="nk-block-des text-soft">
-              <p className="mb-0">
-                View and manage user profile, role and account status.
-              </p>
+              <p>View and manage user profile, role and status.</p>
             </div>
           </div>
-
           <div className="nk-block-head-content">
-            <div className="d-flex flex-wrap gap-2 justify-content-end">
+            <div className="d-flex flex-wrap gap-2">
               {/* Edit User */}
               <Link
                 to={`/admin/users/${id}/edit`}
-                className="btn btn-outline-primary btn-sm d-inline-flex align-items-center"
+                className="btn btn-outline-primary btn-sm"
               >
-                <Edit3 size={16} className="me-1" />
+                <Edit3 className="me-1" size={16} />
                 Edit User
               </Link>
 
-              {/* Educator Verification button (only for educator + admin/subOrgAdmin) */}
+              {/* Educator Verification */}
               {isEducator && canVerifyEducator && (
                 <button
                   type="button"
-                  className="btn btn-outline-primary btn-sm d-inline-flex align-items-center"
+                  className="btn btn-outline-primary btn-sm"
                   onClick={() => navigate(`/admin/educators/${id}/verify`)}
                 >
-                  <ShieldCheck size={16} className="me-1" />
+                  <ShieldCheck className="me-1" size={16} />
                   Educator Verification
                 </button>
               )}
@@ -221,10 +301,10 @@ const UserDetailsPage = () => {
               {isAdmin && (
                 <button
                   type="button"
-                  className="btn btn-outline-primary btn-sm d-inline-flex align-items-center"
+                  className="btn btn-outline-primary btn-sm"
                   onClick={() => navigate(`/admin/users/${id}/transfer`)}
                 >
-                  <ArrowLeftRight size={16} className="me-1" />
+                  <ArrowLeftRight className="me-1" size={16} />
                   Transfer Sub-Org
                 </button>
               )}
@@ -232,7 +312,7 @@ const UserDetailsPage = () => {
               {/* Suspend / Activate */}
               <button
                 type="button"
-                className={`btn btn-sm d-inline-flex align-items-center ${
+                className={`btn btn-sm ${
                   isActive ? "btn-outline-danger" : "btn-outline-success"
                 }`}
                 disabled={actionLoading}
@@ -240,11 +320,11 @@ const UserDetailsPage = () => {
               >
                 {isActive ? (
                   <>
-                    <UserMinus size={16} className="me-1" /> Suspend
+                    <UserMinus className="me-1" size={16} /> Suspend
                   </>
                 ) : (
                   <>
-                    <UserCheck size={16} className="me-1" /> Activate
+                    <UserCheck className="me-1" size={16} /> Activate
                   </>
                 )}
               </button>
@@ -252,11 +332,11 @@ const UserDetailsPage = () => {
               {/* Delete */}
               <button
                 type="button"
-                className="btn btn-sm btn-outline-danger d-inline-flex align-items-center"
+                className="btn btn-sm btn-outline-danger"
                 disabled={actionLoading}
                 onClick={handleDelete}
               >
-                <Trash2 size={16} className="me-1" />
+                <Trash2 className="me-1" size={16} />
                 Delete
               </button>
             </div>
@@ -264,6 +344,7 @@ const UserDetailsPage = () => {
         </div>
       </div>
 
+      {/* PAGE-LEVEL ALERTS */}
       {error && (
         <div className="alert alert-danger mb-3" role="alert">
           {error}
@@ -274,50 +355,44 @@ const UserDetailsPage = () => {
       <div className="nk-block">
         <div className="card card-bordered card-stretch">
           <div className="card-inner">
-
-            {/* TOP PROFILE HEADER */}
+            {/* Header / summary */}
             <div className="d-flex align-items-center mb-4">
-              <div className="user-avatar bg-primary-dim me-3">
+              <div className="user-avatar bg-primary me-3">
                 <span>{initials}</span>
               </div>
-              <div className="flex-grow-1">
+              <div>
                 <h5 className="mb-1">{user.name || "-"}</h5>
-                <div className="d-flex flex-wrap align-items-center gap-2 small text-muted">
-                  <span className="d-flex align-items-center">
-                    <Mail size={14} className="me-1" />
-                    {user.email || "-"}
+                <div className="text-muted small d-flex flex-wrap gap-2">
+                  {user.email && (
+                    <span className="d-inline-flex align-items-center me-2">
+                      <Mail size={14} className="me-1" /> {user.email}
+                    </span>
+                  )}
+                  {user.phone && (
+                    <span className="d-inline-flex align-items-center me-2">
+                      <Phone size={14} className="me-1" /> {user.phone}
+                    </span>
+                  )}
+                </div>
+                <div className="mt-1 d-flex flex-wrap gap-2 align-items-center">
+                  <span className="badge bg-light text-dark text-capitalize">
+                    Role: {user.role || user.userRole || "-"}
                   </span>
-                  <span className="text-soft">•</span>
-                  <span className="d-flex align-items-center">
+                  <span className={getStatusBadgeClass(user.status)}>
+                    {user.status || "-"}
+                  </span>
+                  <span className="badge bg-outline-primary d-inline-flex align-items-center">
                     <Building2 size={14} className="me-1" />
                     {organizationName}
-                  </span>
-                </div>
-                <div className="mt-1 small">
-                  <span className="me-2">
-                    Role:{" "}
-                    <strong className="text-capitalize">
-                      {user.role || user.userRole || "-"}
-                    </strong>
-                  </span>
-                  <span>
-                    Status:{" "}
-                    <span
-                      className={getStatusBadgeClass(user.status)}
-                      style={{ fontSize: "0.75rem" }}
-                    >
-                      {user.status || "-"}
-                    </span>
                   </span>
                 </div>
               </div>
             </div>
 
-            {/* DETAIL CARDS */}
+            {/* Detail cards */}
             <div className="row g-gs">
-              {/* LEFT: Basic Info */}
               <div className="col-md-6">
-                <div className="card card-bordered h-100">
+                <div className="card card-bordered">
                   <div className="card-inner">
                     <h6 className="title mb-3">Basic Information</h6>
                     <dl className="row gy-2">
@@ -325,34 +400,22 @@ const UserDetailsPage = () => {
                       <dd className="col-sm-8">{user.name || "-"}</dd>
 
                       <dt className="col-sm-4">Email</dt>
-                      <dd className="col-sm-8 d-flex align-items-center">
-                        <Mail size={14} className="me-1 text-primary" />
-                        {user.email || "-"}
-                      </dd>
+                      <dd className="col-sm-8">{user.email || "-"}</dd>
 
                       <dt className="col-sm-4">Phone</dt>
-                      <dd className="col-sm-8 d-flex align-items-center">
-                        <Phone size={14} className="me-1 text-primary" />
-                        {user.phone || "-"}
-                      </dd>
+                      <dd className="col-sm-8">{user.phone || "-"}</dd>
 
                       <dt className="col-sm-4">Organization</dt>
-                      <dd className="col-sm-8 d-flex align-items-center">
-                        <Building2 size={14} className="me-1 text-primary" />
-                        {organizationName}
-                      </dd>
+                      <dd className="col-sm-8">{organizationName}</dd>
 
                       <dt className="col-sm-4">Role</dt>
-                      <dd className="col-sm-8 text-capitalize">
+                      <dd className="col-sm-8">
                         {user.role || user.userRole || "-"}
                       </dd>
 
                       <dt className="col-sm-4">Status</dt>
                       <dd className="col-sm-8">
-                        <span
-                          className={getStatusBadgeClass(user.status)}
-                          style={{ fontSize: "0.75rem" }}
-                        >
+                        <span className={getStatusBadgeClass(user.status)}>
                           {user.status || "-"}
                         </span>
                       </dd>
@@ -361,47 +424,39 @@ const UserDetailsPage = () => {
                 </div>
               </div>
 
-              {/* RIGHT: Activity */}
               <div className="col-md-6">
-                <div className="card card-bordered h-100">
+                <div className="card card-bordered">
                   <div className="card-inner">
                     <h6 className="title mb-3">Activity</h6>
                     <dl className="row gy-2">
-                      <dt className="col-sm-4">Joined</dt>
-                      <dd className="col-sm-8 d-flex align-items-center">
-                        <CalendarClock
-                          size={14}
-                          className="me-1 text-primary"
-                        />
+                      <dt className="col-sm-4 d-flex align-items-center">
+                        <CalendarClock size={14} className="me-1" /> Joined
+                      </dt>
+                      <dd className="col-sm-8">
                         {formatDate(user.createdAt)}
                       </dd>
 
-                      <dt className="col-sm-4">Last Active</dt>
-                      <dd className="col-sm-8 d-flex align-items-center">
-                        <Activity size={14} className="me-1 text-primary" />
+                      <dt className="col-sm-4 d-flex align-items-center">
+                        <Activity size={14} className="me-1" /> Last Active
+                      </dt>
+                      <dd className="col-sm-8">
                         {formatDate(user.lastActiveAt || user.lastLoginAt)}
                       </dd>
 
-                      <dt className="col-sm-4">Last Updated</dt>
-                      <dd className="col-sm-8 d-flex align-items-center">
-                        <CalendarClock
-                          size={14}
-                          className="me-1 text-primary"
-                        />
+                      <dt className="col-sm-4 d-flex align-items-center">
+                        <CalendarClock size={14} className="me-1" />
+                        Last Updated
+                      </dt>
+                      <dd className="col-sm-8">
                         {formatDate(user.updatedAt)}
                       </dd>
                     </dl>
-
-                    {/* Placeholder for future: Permissions / Courses etc */}
-                    <div className="mt-3 small text-soft">
-                      You can extend this section with course enrolments,
-                      permissions or activity logs as needed.
-                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
+            {/* future: sections for enrollments, courses, etc. */}
           </div>
         </div>
       </div>

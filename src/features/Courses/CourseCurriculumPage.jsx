@@ -26,6 +26,7 @@ import {
   Edit2,
   CheckCircle2,
   XCircle,
+  PlayCircle,
 } from "lucide-react";
 
 import "./CourseCurriculumPage.css";
@@ -40,6 +41,17 @@ const LESSON_TYPES = [
 // Helper: get playable URL from a lesson (from backend)
 const getLessonPlayableUrl = (lesson) => {
   if (!lesson) return "";
+  
+  // 1. Prioritize videoUrl for video types
+  if (lesson.type === "video") {
+     if (lesson.videoUrl) return lesson.videoUrl;
+     // Fallback to resourceUrl if videoUrl is empty
+     if (lesson.resourceUrl && !String(lesson.resourceUrl).startsWith("mock://")) {
+       return lesson.resourceUrl;
+     }
+  }
+
+  // 2. Default check for other types
   const raw =
     lesson.videoUrl ||
     (lesson.resourceUrl &&
@@ -430,18 +442,27 @@ const CourseCurriculumPage = () => {
       setSaving(true);
 
       // Map "resourceUrl" from UI → proper backend fields
-      let payload;
+      let payload = {};
       if (field === "resourceUrl") {
-        const normalized =
-          typeof value === "string" ? value.trim() : value;
+        const normalized = typeof value === "string" ? value.trim() : value;
+        const isVideo = lessonDraft?.type === "video";
 
-        if (lessonDraft?.type === "video") {
+        if (isVideo) {
+          // Video: must provide videoUrl + videoSource (cannot be null)
+          // Detect if youtube, else default to sharepoint (since external not supported)
+          const isYoutube = normalized && (normalized.includes("youtube.com") || normalized.includes("youtu.be"));
           payload = {
-            videoSource: "youtube", // default; backend can ignore/override
-            videoUrl: normalized || null,
+            videoUrl: normalized || "", // Ensures not null/undefined
+            videoSource: isYoutube ? "youtube" : "sharepoint", 
+            resourceUrl: null
           };
         } else {
-          payload = { resourceUrl: normalized || null };
+          // Text/PDF: use resourceUrl
+          payload = { 
+            resourceUrl: normalized || null,
+            videoUrl: null
+            // do NOT send videoSource: null, as it causes 400 error
+          };
         }
       } else if (field === "durationMinutes") {
         payload = { [field]: value ?? 0 };
@@ -461,10 +482,12 @@ const CourseCurriculumPage = () => {
         }))
       );
 
-      // Keep draft in sync with updated lesson,
-      // BUT do NOT overwrite resourceUrl (we trust what user typed)
+      // Keep draft in sync with updated lesson
       setLessonDraft((prev) => {
         if (!prev || prev.id !== lessonId) return prev;
+
+        // Re-calculate the URL to display
+        const freshUrl = getLessonPlayableUrl(updated);
 
         return {
           ...prev,
@@ -475,6 +498,7 @@ const CourseCurriculumPage = () => {
               ? String(updated.durationMinutes)
               : prev.durationMinutes,
           isPreview: !!updated.isPreview,
+          resourceUrl: freshUrl, // Force update URL
         };
       });
 
@@ -1239,6 +1263,13 @@ const CourseCurriculumPage = () => {
                               handleLessonDraftChange(
                                 "resourceUrl",
                                 e.target.value
+                              )
+                            }
+                            onBlur={() =>
+                              persistLessonField(
+                                lessonDraft.id,
+                                "resourceUrl",
+                                lessonDraft.resourceUrl
                               )
                             }
                           />

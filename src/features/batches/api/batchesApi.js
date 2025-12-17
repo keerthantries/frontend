@@ -1,113 +1,100 @@
 // src/features/batches/api/batchesApi.js
 import httpClient from "../../../services/httpClient";
 
-/**
- * Helpers to normalise backend responses
- */
-function unwrapSingle(res) {
-  const body = res?.data;
-  return body?.data ?? body ?? null;
-}
+// ========== CORE BATCHES APIS ==========
 
-function unwrapList(res) {
-  const body = res?.data;
+// GET /api/admin/batches
+export async function fetchBatches({
+  page = 1,
+  limit = 20,
+  q,
+  status,
+  mode,
+  courseId,
+  educatorId,
+  subOrgId,
+} = {}) {
+  const params = { page, limit };
 
-  if (body?.data?.items) {
-    return {
-      items: body.data.items,
-      pagination: body.data.pagination ?? null,
-    };
-  }
+  if (q && q.trim()) params.q = q.trim();
+  if (status && status !== "all") params.status = status;
+  if (mode && mode !== "all") params.mode = mode;
+  if (courseId) params.courseId = courseId;
+  if (educatorId) params.educatorId = educatorId;
+  if (subOrgId) params.subOrgId = subOrgId;
 
-  if (Array.isArray(body)) {
-    return {
-      items: body,
-      pagination: null,
-    };
-  }
-
-  if (body?.items) {
-    return {
-      items: body.items,
-      pagination: body.pagination ?? null,
-    };
-  }
-
-  return {
-    items: [],
-    pagination: null,
-  };
-}
-
-/* ================== BATCHES (ADMIN) ================== */
-
-export async function listBatches(params = {}) {
   const res = await httpClient.get("/api/admin/batches", { params });
-  const { items, pagination } = unwrapList(res);
-  return { data: { items, pagination } };
+  const data = res.data;
+
+  if (data?.data?.items) {
+    return {
+      items: data.data.items,
+      pagination: data.data.pagination || {},
+    };
+  }
+
+  if (data?.items) {
+    return {
+      items: data.items,
+      pagination: data.pagination || {},
+    };
+  }
+
+  throw new Error("Unexpected batches API response shape.");
 }
 
-export async function getBatchById(id) {
+// GET /api/admin/batches/:id
+export async function fetchBatchById(id) {
   const res = await httpClient.get(`/api/admin/batches/${id}`);
-  const batch = unwrapSingle(res);
-  return { data: batch };
+  const data = res.data;
+  if (data?.data) return data.data;
+  return data;
 }
 
+// POST /api/admin/batches
 export async function createBatch(payload) {
   const res = await httpClient.post("/api/admin/batches", payload);
-  const batch = unwrapSingle(res);
-  return { data: batch };
+  return res.data;
 }
 
+// PATCH /api/admin/batches/:id
 export async function updateBatch(id, payload) {
   const res = await httpClient.patch(`/api/admin/batches/${id}`, payload);
-  const batch = unwrapSingle(res);
-  return { data: batch };
+  return res.data;
 }
 
-export async function changeBatchStatus(id, statusPayload) {
-  const res = await httpClient.patch(
-    `/api/admin/batches/${id}/status`,
-    statusPayload
-  );
-  const batch = unwrapSingle(res);
-  return { data: batch };
+// PATCH /api/admin/batches/:id/status
+export async function changeBatchStatus(id, status) {
+  const res = await httpClient.patch(`/api/admin/batches/${id}/status`, {
+    status,
+  });
+  return res.data;
 }
 
-/* ================== ENROLLMENTS (ADMIN) ================== */
+// ========== LOOKUPS (COURSE / EDUCATOR / LEARNER-SIDE LATER) ==========
 
-export async function listBatchEnrollments(batchId, params = {}) {
-  const res = await httpClient.get(
-    `/api/admin/batches/${batchId}/enrollments`,
-    { params }
-  );
-  const body = res?.data;
-  const items = body?.data?.items ?? body?.items ?? [];
-  const pagination =
-    body?.data?.pagination ?? body?.pagination ?? {
-      page: params.page || 1,
-      limit: params.limit || 10,
-      total: items.length,
-      totalPages: 1,
-    };
+// GET /api/courses?status=published&q=
+export async function searchPublishedCourses({ q = "", page = 1, limit = 20 } = {}) {
+  const params = { status: "published", page, limit };
+  if (q && q.trim()) params.q = q.trim();
 
-  return { data: { items, pagination } };
+  const res = await httpClient.get("/api/courses", { params });
+  const data = res.data;
+
+  if (data?.data?.items) return data.data.items;
+  if (data?.items) return data.items;
+  return Array.isArray(data) ? data : [];
 }
 
-export async function enrollLearner(batchId, payload) {
-  const res = await httpClient.post(
-    `/api/admin/batches/${batchId}/enrollments`,
-    payload
-  );
-  const enrollment = unwrapSingle(res);
-  return { data: enrollment };
-}
+// GET /api/admin/users?role=educator&q=
+export async function searchEducators({ q = "", page = 1, limit = 20 } = {}) {
+  const params = { role: "educator", page, limit };
+  if (q && q.trim()) params.q = q.trim();
 
-export async function bulkEnrollLearners(batchId, payload) {
-  const res = await httpClient.post(
-    `/api/admin/batches/${batchId}/enrollments/bulk`,
-    payload
-  );
-  const body = unwrapSingle(res);
-  return { data: body };
+  const res = await httpClient.get("/api/admin/users", { params });
+  const data = res.data;
+
+  if (data?.data?.items) return data.data.items;
+  if (data?.items) return data.items;
+  return Array.isArray(data) ? data : [];
 }

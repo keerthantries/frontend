@@ -1,7 +1,8 @@
+// src/features/userManagement/pages/LearnerListPage.jsx
 import React from "react";
 import UserListScreen from "../components/UserListScreen";
 
-const LearnersListPage = () => {
+const LearnerListPage = () => {
   return (
     <UserListScreen
       title="Learners"
@@ -11,4 +12,4 @@ const LearnersListPage = () => {
   );
 };
 
-export default LearnersListPage;
+export default LearnerListPage;

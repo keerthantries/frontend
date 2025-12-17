@@ -8,28 +8,38 @@ import AdminDashboardPage from "./features/dashboard/pages/AdminDashboardPage.js
 import SubOrgListPage from "./features/subOrgManagement/pages/SubOrgListPage.jsx";
 import SubOrgUpsertPage from "./features/subOrgManagement/pages/SubOrgUpsertPage.jsx";
 import SubOrgWithAdminPage from "./features/subOrgManagement/pages/SubOrgWithAdminPage.jsx";
+
 import UserTransferPage from "./features/userManagement/pages/UserTransferPage.jsx";
+
 
 import UsersListPage from "./features/userManagement/pages/UsersListPage.jsx";
 import EducatorsListPage from "./features/userManagement/pages/EducatorListPage.jsx";
 import LearnersListPage from "./features/userManagement/pages/LearnerListPage.jsx";
+import SubOrgAdminsListPage from "./features/userManagement/pages/SubOrgAdminsListPage.jsx";
 
 import CoursesList from "./features/Courses/CoursesList.jsx";
 import AddCoursePage from "./features/Courses/AddCoursePage.jsx";
 import CourseCurriculumPage from "./features/Courses/CourseCurriculumPage.jsx";
 import CoursePreviewPage from "./features/Courses/CoursePreviewPage.jsx";
+import CourseCategoriesPage from "./features/Courses/CourseCategoriesPage.jsx";
 
 import UserDetailsPage from "./features/userManagement/pages/UserDetailsPage.jsx";
 import UserUpsertPage from "./features/userManagement/pages/UserUpsertPage.jsx";
-import EducatorVerificationPage from "./features/userManagement/pages/EducatorVerificationPage";
+import EducatorVerificationPage from "./features/userManagement/pages/EducatorVerificationPage.jsx";
 
 import BatchesListPage from "./features/batches/pages/BatchesListPage.jsx";
 import AddBatchPage from "./features/batches/pages/AddBatchPage.jsx";
 import BatchDetailPage from "./features/batches/pages/BatchDetailsPage.jsx";
+import BatchEnrollmentsPage from "./features/enrollments/pages/BatchEnrollmentsPage.jsx";
+
+import BatchAttendancePage from "./features/attendance/pages/BatchAttendancePage.jsx";
+import SessionAttendancePage from "./features/attendance/pages/SessionAttendancePage.jsx";
+
+import EnrollmentsListPage from "./features/enrollments/pages/EnrollmentsListPage.jsx";
+import EnrollLearnerPage from "./features/enrollments/pages/EnrollLearnerPage.jsx";
 
 import ProtectedRoute from "./features/auth/components/ProtectedRoute.jsx";
 
-import ErrorPage404 from "./features/errors/ErrorPage404.jsx";
 function App() {
   return (
     <Routes>
@@ -44,7 +54,6 @@ function App() {
         element={<ProtectedRoute allowedRoles={["admin", "subOrgAdmin"]} />}
       >
         <Route path="/admin" element={<AdminLayout />}>
-          
           {/* /admin -> /admin/dashboard */}
           <Route index element={<Navigate to="dashboard" replace />} />
 
@@ -56,6 +65,7 @@ function App() {
           <Route path="courses/add" element={<AddCoursePage />} />
           <Route path="courses/:courseId/curriculum" element={<CourseCurriculumPage />} />
           <Route path="courses/:courseId/preview" element={<CoursePreviewPage />} />
+          <Route path="categories" element={<CourseCategoriesPage />} />
 
           {/* User Management */}
           <Route path="users" element={<UsersListPage />} />
@@ -69,6 +79,9 @@ function App() {
           <Route path="educators/:id/verify" element={<EducatorVerificationPage />} />
           <Route path="learners" element={<LearnersListPage />} />
 
+          {/* 🌟 NEW: Sub-Org Admins list */}
+          <Route path="suborg-admins" element={<SubOrgAdminsListPage />} />
+
           {/* Sub Orgs */}
           <Route path="suborgs" element={<SubOrgListPage />} />
           <Route path="suborgs/create" element={<SubOrgUpsertPage />} />
@@ -80,15 +93,20 @@ function App() {
           <Route path="batches" element={<BatchesListPage />} />
           <Route path="batches/add" element={<AddBatchPage />} />
           <Route path="batches/:id" element={<BatchDetailPage />} />
-          
+          <Route path="batches/:batchId/enrollments" element={<BatchEnrollmentsPage />}/>
+          <Route path="/admin/batches/:id/edit" element={<AddBatchPage />} />
+          <Route path="batches/:batchId/attendance" element={<BatchAttendancePage />} />
+          <Route path="attendance/sessions/:sessionId" element={<SessionAttendancePage />} />
+
+          <Route path="enrolments" element={<EnrollmentsListPage />} />
+          <Route path="enrolments/new" element={<EnrollLearnerPage />} />
         </Route>
       </Route>
 
       {/* 404 */}
-      <Route path="*" element={<ErrorPage404/>} />
+      <Route path="*" element={<div>404 - Page not found</div>} />
     </Routes>
   );
 }
 
 export default App;
-

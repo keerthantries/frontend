@@ -1,275 +1,348 @@
 // src/features/Courses/api/coursesApi.js
-import httpClient from "./../../../services/httpClient";
+import httpClient from "../../../services/httpClient";
 
 /**
- * Helpers to normalise backend responses
+ * Small helpers to unwrap typical response envelopes
  */
-function unwrapSingle(res) {
-  const body = res?.data;
-  return body?.data ?? body ?? null;
-}
-
-function unwrapList(res, fallback = {}) {
-  const body = res?.data;
-
-  if (body?.data?.items) {
-    return {
-      items: body.data.items,
-      total: body.data.total ?? body.data.items.length,
-      page: body.data.page ?? fallback.page,
-      limit: body.data.limit ?? fallback.limit,
-    };
-  }
-
-  if (Array.isArray(body)) {
-    return {
-      items: body,
-      total: body.length,
-      page: fallback.page,
-      limit: fallback.limit,
-    };
-  }
-
-  if (body?.items) {
-    return {
-      items: body.items,
-      total: body.total ?? body.items.length,
-      page: body.page ?? fallback.page,
-      limit: body.limit ?? fallback.limit,
-    };
-  }
-
-  throw new Error("Unexpected courses API response shape.");
-}
-
-/* ========== NORMALISERS (id vs _id, etc.) ========== */
-
-function normaliseCourse(course) {
-  if (!course) return course;
-  return {
-    ...course,
-    id: course.id || course._id,
-  };
-}
-
-function normaliseLesson(lesson, courseId, sectionId) {
-  if (!lesson) return lesson;
-  const id = lesson.id || lesson._id;
-
-  return {
-    ...lesson,
-    id,
-    courseId: lesson.courseId || courseId || undefined,
-    sectionId: lesson.sectionId || sectionId || undefined,
-  };
-}
-
-function normaliseSection(section, courseId) {
-  if (!section) return section;
-  const id = section.id || section._id;
-
-  const lessons = (section.lessons || []).map((l) =>
-    normaliseLesson(l, courseId || section.courseId, id)
-  );
-
-  return {
-    ...section,
-    id,
-    courseId: section.courseId || courseId || undefined,
-    lessons,
-  };
-}
-
-/* ========== COURSES ========== */
-
-/**
- * Create a new course
- * POST /api/courses
- */
-export async function createCourse(payload) {
-  const res = await httpClient.post("/api/courses", payload);
-  const raw = unwrapSingle(res);
-  const course = normaliseCourse(raw);
-  return { data: course };
+function unwrap(res) {
+  if (!res) return null;
+  // axios response shape -> res.data
+  const body = res.data ?? res;
+  // some APIs use nested .data
+  if (body && body.data) return body.data;
+  return body;
 }
 
 /**
- * List / filter / paginate courses
- * GET /api/courses?status=All&page=1&limit=10
+ * Normalise created/returned object to ensure callers can rely on .id when possible
  */
+function normalizeObj(obj) {
+  if (!obj || typeof obj !== "object") return obj || null;
+  if (obj.data && typeof obj.data === "object") obj = obj.data;
+  if (obj.course && typeof obj.course === "object") obj = obj.course;
+  if (obj.item && typeof obj.item === "object") obj = obj.item;
+
+  // Clone to avoid mutation side-effects
+  const out = { ...obj };
+
+  if (!out.id && out._id) {
+    out.id = String(out._id);
+  }
+  return out;
+}
+
+/**
+ * Deep Normalizer for Sections + Lessons
+ * Required so the UI doesn't crash when accessing lesson.id
+ */
+function normalizeSection(section) {
+  if (!section) return null;
+  
+  // 1. Normalize the section itself
+  const normSection = normalizeObj(section);
+
+  // 2. Normalize nested lessons if they exist
+  if (Array.isArray(normSection.lessons)) {
+    normSection.lessons = normSection.lessons.map(normalizeObj);
+  }
+
+  return normSection;
+}
+
+/* ================== COURSES LIST ================== */
+// GET /api/courses?...
 export async function fetchCourses({
+  status,
+  category,
+  level,
+  tag,
+  q,
   page = 1,
-  limit = 10,
-  status = "All",
+  limit = 20,
 } = {}) {
   const params = { page, limit };
-  if (status && status !== "All") {
-    params.status = status;
-  }
+
+  if (status && status !== "all") params.status = status;
+  if (category && category !== "all") params.category = category;
+  if (level && level !== "all") params.level = level;
+  if (tag && tag !== "all") params.tag = tag;
+  if (q && q.trim()) params.q = q.trim();
 
   const res = await httpClient.get("/api/courses", { params });
-  const list = unwrapList(res, { page, limit });
+  const data = unwrap(res);
 
-  // Normalise each course so it definitely has `id`
-  const items = (list.items || []).map(normaliseCourse);
+  // common envelope shapes
+  if (data?.items) {
+    return {
+      items: (data.items || []).map(normalizeObj),
+      pagination: data.pagination || data.meta || {},
+    };
+  }
 
-  // Keep the same shape the old fake API returned
-  return {
-    data: {
-      items,
-      total: list.total,
-      page: list.page,
-      limit: list.limit,
-    },
-  };
+  // if it's already list
+  if (Array.isArray(data)) {
+    return { items: data.map(normalizeObj), pagination: { total: data.length } };
+  }
+
+  // fallback
+  return data ?? { items: [], pagination: {} };
 }
 
-/**
- * GET /api/courses/:courseId
- */
-export async function getCourseById(courseId) {
+// alias
+export const listCourses = fetchCourses;
+
+/* ================== SINGLE COURSE CRUD ================== */
+
+// GET /api/courses/:courseId
+export async function fetchCourseById(courseId) {
   const res = await httpClient.get(`/api/courses/${courseId}`);
-  const raw = unwrapSingle(res);
-  const course = normaliseCourse(raw);
-  return { data: course };
+  const raw = unwrap(res);
+  return normalizeObj(raw);
+}
+export const getCourseById = fetchCourseById;
+
+// POST /api/courses
+export async function createCourse(payload) {
+  const res = await httpClient.post("/api/courses", payload);
+  const raw = unwrap(res);
+  const created = normalizeObj(raw);
+  return { data: created };
 }
 
-/**
- * PATCH /api/courses/:courseId
- */
-export async function updateCourse(courseId, updates) {
-  const res = await httpClient.patch(`/api/courses/${courseId}`, updates);
-  const raw = unwrapSingle(res);
-  const course = normaliseCourse(raw);
-  return { data: course };
+// PATCH /api/courses/:courseId
+export async function updateCourse(courseId, payload) {
+  const res = await httpClient.patch(`/api/courses/${courseId}`, payload);
+  const raw = unwrap(res);
+  return { data: normalizeObj(raw) };
 }
 
-/**
- * DELETE /api/courses/:courseId
- */
+// DELETE /api/courses/:courseId
 export async function deleteCourse(courseId) {
   const res = await httpClient.delete(`/api/courses/${courseId}`);
-  const body = res?.data ?? {};
-  return { success: body.success ?? true };
+  const raw = unwrap(res);
+  return { data: raw };
 }
 
-/* ========== CURRICULUM ========== */
+/* ================== CURRICULUM ================== */
 
-/**
- * GET /api/courses/:courseId/curriculum
- * expects backend to return sections + lessons tree
- */
+// GET /api/courses/:courseId/curriculum
 export async function fetchCurriculum(courseId) {
   const res = await httpClient.get(`/api/courses/${courseId}/curriculum`);
-  const body = res?.data;
+  const raw = unwrap(res);
 
-  const rawSections =
-    body?.data?.sections ??
-    body?.sections ??
-    (Array.isArray(body) ? body : []);
+  // common shapes
+  let sections = [];
+  if (raw && raw.sections) sections = raw.sections;
+  else if (Array.isArray(raw)) sections = raw;
+  else if (raw?.data?.sections) sections = raw.data.sections;
 
-  const sections = (rawSections || []).map((sec) =>
-    normaliseSection(sec, courseId)
-  );
-
-  return { data: { sections } };
+  // IMPORTANT: Deep normalize so both Sections and Lessons have .id
+  return { sections: sections.map(normalizeSection) };
 }
+export const getCourseCurriculum = fetchCurriculum;
 
-/* ========== SECTIONS ========== */
+/* CREATE SECTION */
+export async function createSection(courseId, payload) {
+  const body =
+    typeof payload === "string" ? { title: payload } : (payload || {});
+  const res = await httpClient.post(
+    `/api/courses/${courseId}/sections`,
+    body
+  );
+  const raw = unwrap(res);
+  const section = raw?.data ?? raw;
+  return { data: normalizeSection(section) };
+}
 
 /**
- * Sections
- * POST /api/courses/:courseId/sections
- * PATCH /api/courses/sections/:sectionId
- * DELETE /api/courses/sections/:sectionId
+ * updateSection(...) supports two signatures:
+ * - updateSection(sectionId, payload)
+ * - updateSection(courseId, sectionId, payload)
  */
+export async function updateSection(...args) {
+  // 1. Called with (sectionId, payload)
+  if (args.length === 2) {
+    const [sectionId, payload] = args;
+    // FIX: Use course-scoped path which we know works
+    const res = await httpClient.patch(`/api/courses/sections/${sectionId}`, payload);
+    const raw = unwrap(res);
+    return { data: normalizeSection(raw?.data ?? raw) };
+  }
 
-export async function createSection(courseId, title) {
-  const res = await httpClient.post(`/api/courses/${courseId}/sections`, {
-    title,
-  });
-  const raw = unwrapSingle(res);
-  const section = normaliseSection(raw, courseId);
-  return { data: section };
+  // 2. Called with (courseId, sectionId, payload)
+  if (args.length === 3) {
+    const [courseId, sectionId, payload] = args;
+    const res = await httpClient.patch(
+      `/api/courses/${courseId}/sections/${sectionId}`,
+      payload
+    );
+    const raw = unwrap(res);
+    return { data: normalizeSection(raw?.data ?? raw) };
+  }
+
+  throw new Error("Invalid arguments to updateSection");
 }
-
-export async function updateSection(sectionId, updates) {
-  const res = await httpClient.patch(
-    `/api/courses/sections/${sectionId}`,
-    updates
-  );
-  const raw = unwrapSingle(res);
-  const section = normaliseSection(raw, raw?.courseId);
-  return { data: section };
-}
-
-export async function deleteSection(sectionId) {
-  const res = await httpClient.delete(`/api/courses/sections/${sectionId}`);
-  const body = res?.data ?? {};
-  return { success: body.success ?? true };
-}
-
-/* ========== LESSONS ========== */
 
 /**
- * Lessons
- * POST   /api/courses/:courseId/sections/:sectionId/lessons
- * PATCH  /api/courses/lessons/:lessonId
- * DELETE /api/courses/lessons/:lessonId
+ * deleteSection supports:
+ * - deleteSection(sectionId)
+ * - deleteSection(courseId, sectionId)
  */
+export async function deleteSection(...args) {
+  // 1. Called with (sectionId)
+  if (args.length === 1) {
+    const [sectionId] = args;
+    // FIX: Use course-scoped path
+    const res = await httpClient.delete(`/api/courses/sections/${sectionId}`);
+    const raw = unwrap(res);
+    return { data: raw };
+  }
 
+  // 2. Called with (courseId, sectionId)
+  if (args.length === 2) {
+    const [courseId, sectionId] = args;
+    const res = await httpClient.delete(
+      `/api/courses/${courseId}/sections/${sectionId}`
+    );
+    const raw = unwrap(res);
+    return { data: raw };
+  }
+
+  throw new Error("Invalid arguments to deleteSection");
+}
+
+/* LESSONS */
 export async function createLesson(courseId, sectionId, payload) {
   const res = await httpClient.post(
     `/api/courses/${courseId}/sections/${sectionId}/lessons`,
     payload
   );
-  const raw = unwrapSingle(res);
-  const lesson = normaliseLesson(raw, courseId, sectionId);
-  return { data: lesson };
-}
-
-export async function updateLesson(lessonId, updates) {
-  const res = await httpClient.patch(
-    `/api/courses/lessons/${lessonId}`,
-    updates
-  );
-  const raw = unwrapSingle(res);
-  const lesson = normaliseLesson(raw, raw?.courseId, raw?.sectionId);
-  return { data: lesson };
-}
-
-export async function deleteLesson(lessonId) {
-  const res = await httpClient.delete(`/api/courses/lessons/${lessonId}`);
-  const body = res?.data ?? {};
-  return { success: body.success ?? true };
+  const raw = unwrap(res);
+  const lesson = raw?.data ?? raw;
+  return { data: normalizeObj(lesson) };
 }
 
 /**
- * Upload / update lesson material
- *  - If you pass a File → POST /api/courses/lessons/:lessonId/material (multipart)
- *  - If you pass a string → PATCH /api/courses/lessons/:lessonId with { resourceUrl }
+ * updateLesson supports:
+ * - updateLesson(lessonId, payload)
+ * - updateLesson(courseId, lessonId, payload)
  */
-export async function updateLessonMaterial(lessonId, fileOrUrl) {
-  // File upload
-  if (typeof File !== "undefined" && fileOrUrl instanceof File) {
-    const formData = new FormData();
-    formData.append("file", fileOrUrl);
-
-    const res = await httpClient.post(
-      `/api/courses/lessons/${lessonId}/material`,
-      formData
-      // axios will set multipart headers
-    );
-    const raw = unwrapSingle(res);
-    const lesson = normaliseLesson(raw, raw?.courseId, raw?.sectionId);
-    return { data: lesson };
+export async function updateLesson(...args) {
+  // 1. Called with (lessonId, payload)
+  if (args.length === 2) {
+    const [lessonId, payload] = args;
+    // FIX: Use course-scoped path /api/courses/lessons/:id
+    const res = await httpClient.patch(`/api/courses/lessons/${lessonId}`, payload);
+    const raw = unwrap(res);
+    return { data: normalizeObj(raw?.data ?? raw) };
   }
 
-  // Fallback: just update resourceUrl directly
-  const res = await httpClient.patch(`/api/courses/lessons/${lessonId}`, {
-    resourceUrl: fileOrUrl,
-  });
-  const raw = unwrapSingle(res);
-  const lesson = normaliseLesson(raw, raw?.courseId, raw?.sectionId);
-  return { data: lesson };
+  // 2. Called with (courseId, lessonId, payload)
+  if (args.length === 3) {
+    const [courseId, lessonId, payload] = args;
+    const res = await httpClient.patch(
+      `/api/courses/${courseId}/lessons/${lessonId}`,
+      payload
+    );
+    const raw = unwrap(res);
+    return { data: normalizeObj(raw?.data ?? raw) };
+  }
+
+  throw new Error("Invalid arguments to updateLesson");
 }
+
+/**
+ * deleteLesson supports:
+ * - deleteLesson(lessonId)
+ * - deleteLesson(courseId, lessonId)
+ */
+export async function deleteLesson(...args) {
+  // 1. Called with (lessonId)
+  if (args.length === 1) {
+    const [lessonId] = args;
+    // FIX: Use course-scoped path
+    const res = await httpClient.delete(`/api/courses/lessons/${lessonId}`);
+    const raw = unwrap(res);
+    return { data: raw };
+  }
+
+  // 2. Called with (courseId, lessonId)
+  if (args.length === 2) {
+    const [courseId, lessonId] = args;
+    const res = await httpClient.delete(
+      `/api/courses/${courseId}/lessons/${lessonId}`
+    );
+    const raw = unwrap(res);
+    return { data: raw };
+  }
+
+  throw new Error("Invalid arguments to deleteLesson");
+}
+
+/* ================== LESSON MATERIAL ================== */
+
+// upload with courseId (explicit path)
+export async function uploadLessonMaterial(courseId, lessonId, file) {
+  const form = new FormData();
+  form.append("file", file);
+
+  const res = await httpClient.post(
+    `/api/courses/${courseId}/lessons/${lessonId}/material`,
+    form,
+    {
+      headers: { "Content-Type": "multipart/form-data" },
+    }
+  );
+  const raw = unwrap(res);
+  const lesson = raw?.data ?? raw;
+  return { data: normalizeObj(lesson) };
+}
+
+// updateLessonMaterial(lessonId, file)
+export async function updateLessonMaterial(lessonId, file) {
+  const form = new FormData();
+  form.append("file", file);
+
+  // Use the course-scoped path which we know is reliable
+  try {
+    const res = await httpClient.post(
+      `/api/courses/lessons/${lessonId}/material`,
+      form,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+      }
+    );
+    const raw = unwrap(res);
+    const lesson = raw?.data ?? raw;
+    return { data: normalizeObj(lesson) };
+  } catch (err) {
+    throw err;
+  }
+}
+
+/* ================== EXPORT DEFAULT SERVICE OBJECT ================== */
+
+const courseService = {
+  fetchCourses,
+  listCourses,
+
+  fetchCourseById,
+  getCourseById,
+  createCourse,
+  updateCourse,
+  deleteCourse,
+
+  fetchCurriculum,
+  getCourseCurriculum,
+  createSection,
+  updateSection,
+  deleteSection,
+  createLesson,
+  updateLesson,
+  deleteLesson,
+
+  uploadLessonMaterial,
+  updateLessonMaterial,
+};
+
+export default courseService;

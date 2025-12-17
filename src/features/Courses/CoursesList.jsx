@@ -1,15 +1,32 @@
-// src/features/Courses/pages/CoursesList.jsx
-import React, { useEffect, useState } from "react";
+// src/features/Courses/CoursesList.jsx
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  Search,
+  Eye,
+  ListTree,
+  Layers3,
+  PlayCircle,
+  Trash2,
+  Filter,
+} from "lucide-react";
 import { fetchCourses, deleteCourse } from "./api/coursesApi";
 
 import { FaPlus } from "react-icons/fa";
 import { FiMoreVertical, FiEye, FiTrash2, FiEdit } from "react-icons/fi";
 import { HiOutlineSearch } from "react-icons/hi";
 
+const formatDate = (iso) => {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "-";
+  return d.toLocaleDateString();
+};
+
 const CoursesList = () => {
   const navigate = useNavigate();
 
+  // --- newer logic/state preserved exactly ---
   const [courses, setCourses] = useState([]);
   const [pagination, setPagination] = useState({
     page: 1,
@@ -18,98 +35,153 @@ const CoursesList = () => {
     totalPages: 1,
   });
 
-  const [statusFilter, setStatusFilter] = useState("All");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [levelFilter, setLevelFilter] = useState("all");
+  const [tagFilter, setTagFilter] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
-  // Debounce search like UserListScreen
+  const [loading, setLoading] = useState(false);
+  const [actionLoadingId, setActionLoadingId] = useState(null);
+  const [error, setError] = useState("");
+
+  // debounce search (same timing and behaviour as newer file)
   useEffect(() => {
-    const id = setTimeout(() => {
-      setDebouncedSearch(searchTerm);
+    const handle = setTimeout(() => {
       setPagination((prev) => ({ ...prev, page: 1 }));
+      setDebouncedSearch(searchTerm.trim());
     }, 400);
-    return () => clearTimeout(id);
+    return () => clearTimeout(handle);
   }, [searchTerm]);
 
-  const loadCourses = async () => {
-    try {
+  // fetch courses (preserve exactly)
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadCourses() {
       setLoading(true);
       setError("");
 
-      const params = {
-        page: pagination.page,
-        limit: pagination.limit,
-      };
+      try {
+        const result = await fetchCourses({
+          page: pagination.page,
+          limit: pagination.limit,
+          status: statusFilter === "all" ? undefined : statusFilter,
+          category: categoryFilter === "all" ? undefined : categoryFilter,
+          level: levelFilter === "all" ? undefined : levelFilter,
+          tag: tagFilter || undefined,
+          q: debouncedSearch || undefined,
+        });
 
-      if (statusFilter && statusFilter !== "All") {
-        params.status = statusFilter.toLowerCase();
+        if (!isMounted) return;
+
+        const items = result.items || [];
+        const pag = result.pagination || {};
+
+        setCourses(items);
+        setPagination((prev) => ({
+          ...prev,
+          page: pag.page ?? prev.page,
+          limit: pag.limit ?? prev.limit,
+          total: pag.total ?? items.length,
+          totalPages: pag.totalPages ?? prev.totalPages ?? 1,
+        }));
+      } catch (err) {
+        if (!isMounted) return;
+        console.error("Error fetching courses:", err);
+        const message =
+          err?.response?.data?.message ||
+          err?.message ||
+          "Failed to load courses.";
+        setError(message);
+      } finally {
+        if (isMounted) setLoading(false);
       }
-
-      if (debouncedSearch) {
-        params.q = debouncedSearch;
-      }
-
-      const { data } = await fetchCourses(params);
-
-      const items = data.items || data.courses || [];
-      const total = data.total ?? data.totalItems ?? items.length;
-      const totalPages =
-        data.totalPages ??
-        Math.max(1, Math.ceil(total / (pagination.limit || 10)));
-
-      setCourses(items);
-      setPagination((prev) => ({
-        ...prev,
-        total,
-        totalPages,
-      }));
-    } catch (err) {
-      console.error(err);
-      setError("Failed to load courses");
-    } finally {
-      setLoading(false);
     }
-  };
 
-  useEffect(() => {
     loadCourses();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagination.page, pagination.limit, statusFilter, debouncedSearch]);
 
-  const handleChangePage = (newPage) => {
-    if (newPage < 1 || newPage > (pagination.totalPages || 1)) return;
-    setPagination((prev) => ({ ...prev, page: newPage }));
+    return () => {
+      isMounted = false;
+    };
+  }, [
+    pagination.page,
+    pagination.limit,
+    statusFilter,
+    categoryFilter,
+    levelFilter,
+    tagFilter,
+    debouncedSearch,
+  ]);
+
+  const handleChangePage = (page) => {
+    if (page < 1 || page > (pagination.totalPages || 1)) return;
+    setPagination((prev) => ({ ...prev, page }));
   };
 
+  // preserve newer delete behaviour exactly (uses actionLoadingId and removes by course.id)
   const handleDeleteCourse = async (courseId) => {
     const ok = window.confirm(
-      "Delete this course and all its curriculum? This cannot be undone."
+      "Are you sure you want to delete this course? This will also delete its sections and lessons."
     );
     if (!ok) return;
 
     try {
-      setLoading(true);
+      setActionLoadingId(courseId);
       await deleteCourse(courseId);
-      await loadCourses();
+      setCourses((prev) => prev.filter((c) => c.id !== courseId));
     } catch (err) {
-      console.error(err);
-      setError("Failed to delete course");
+      console.error("Delete course error:", err);
+      alert(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Failed to delete course."
+      );
     } finally {
-      setLoading(false);
+      setActionLoadingId(null);
     }
   };
 
-  const totalCourses = pagination.total ?? courses.length;
+  const distinctCategories = useMemo(() => {
+    const set = new Set();
+    courses.forEach((c) => {
+      if (c.category) set.add(c.category);
+    });
+    return Array.from(set);
+  }, [courses]);
 
-  const getStatusBadgeClass = (status) => {
-    const s = (status || "").toLowerCase();
-    if (s === "published") return "badge-dim bg-success";
-    if (s === "draft") return "badge-dim bg-warning";
-    if (s === "archived") return "badge-dim bg-secondary";
-    return "badge-dim bg-light text-muted";
+  const distinctLevels = useMemo(() => {
+    const set = new Set();
+    courses.forEach((c) => {
+      if (c.level) set.add(c.level);
+    });
+    return Array.from(set);
+  }, [courses]);
+
+  const handleCreateBatch = (course, mode) => {
+    // preserve newer behaviour using course.id
+    navigate("/admin/batches/add", {
+      state: {
+        courseId: course.id,
+        courseTitle: course.title,
+        preferredMode: mode,
+      },
+    });
+  };
+
+  // ---------- helper functions older layout expects (pure-read) ----------
+  const getCourseId = (course) => course.id || course._id || course.courseId;
+
+  const getInitials = (title) => {
+    if (!title) return "C";
+    return title
+      .split(" ")
+      .filter(Boolean)
+      .map((w) => w[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
   };
 
   const getPriceLabel = (course) => {
@@ -128,16 +200,14 @@ const CoursesList = () => {
   const getApprovalLabel = (course) => {
     const raw =
       course.approvalStatus ||
-      (course.approval &&
-        (course.approval.state || course.approval.status)) ||
+      (course.approval && (course.approval.state || course.approval.status)) ||
       "";
     const normalized = String(raw || "").toLowerCase();
 
     if (!normalized || normalized === "pending") return "Pending";
     if (normalized === "approved") return "Approved";
     if (normalized === "rejected") return "Rejected";
-    if (normalized === "in-review" || normalized === "review")
-      return "In Review";
+    if (normalized === "in-review" || normalized === "review") return "In Review";
 
     return raw || "Pending";
   };
@@ -150,32 +220,22 @@ const CoursesList = () => {
     return "badge-dim bg-warning";
   };
 
-  const getCourseId = (course) =>
-    course.id || course._id || course.courseId;
-
-  const getInitials = (title) => {
-    if (!title) return "C";
-    return title
-      .split(" ")
-      .filter(Boolean)
-      .map((w) => w[0])
-      .join("")
-      .slice(0, 2)
-      .toUpperCase();
+  const getStatusBadgeClass = (status) => {
+    const s = (status || "").toLowerCase();
+    if (s === "published") return "badge-dim bg-success";
+    if (s === "draft") return "badge-dim bg-warning";
+    if (s === "archived") return "badge-dim bg-secondary";
+    return "badge-dim bg-light text-muted";
   };
 
-  const formatDate = (value) => {
-    if (!value) return "-";
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return "-";
-    return d.toLocaleDateString();
-  };
+  const totalCourses = pagination.total ?? courses.length;
 
+  // ---------- Render: older styles/layout but using newer logic/state ----------
   return (
     <div className="container-fluid">
       <div className="nk-content-inner">
         <div className="nk-content-body">
-          {/* HEADER */}
+          {/* HEADER (older look) */}
           <div className="nk-block-head nk-block-head-sm">
             <div className="nk-block-between">
               <div className="nk-block-head-content">
@@ -213,6 +273,7 @@ const CoursesList = () => {
                           />
                         </div>
                       </li>
+
                       <li>
                         <div className="dropdown">
                           <button
@@ -220,28 +281,32 @@ const CoursesList = () => {
                             className="btn btn-outline-light dropdown-toggle"
                             data-bs-toggle="dropdown"
                           >
-                            {statusFilter === "All"
+                            {statusFilter === "all"
                               ? "All Status"
-                              : statusFilter}
+                              : statusFilter.charAt(0).toUpperCase() +
+                                statusFilter.slice(1)}
                           </button>
                           <div className="dropdown-menu dropdown-menu-end">
-                            {["All", "Draft", "Published", "Archived"].map(
-                              (status) => (
+                            {["all", "draft", "published", "archived"].map(
+                              (st) => (
                                 <button
-                                  key={status}
+                                  key={st}
                                   type="button"
                                   className={`dropdown-item ${
-                                    statusFilter === status ? "active" : ""
+                                    statusFilter === st ? "active" : ""
                                   }`}
-                                  onClick={() => setStatusFilter(status)}
+                                  onClick={() => setStatusFilter(st)}
                                 >
-                                  {status}
+                                  {st === "all"
+                                    ? "All"
+                                    : st.charAt(0).toUpperCase() + st.slice(1)}
                                 </button>
                               )
                             )}
                           </div>
                         </div>
                       </li>
+
                       <li className="nk-block-tools-opt">
                         <button
                           type="button"
@@ -266,8 +331,109 @@ const CoursesList = () => {
             </div>
           </div>
 
-          {/* TABLE */}
+          {/* FILTERS CARD (use newer controls but keep older container above) */}
           <div className="nk-block">
+            <div className="card card-bordered mb-3">
+              <div className="card-inner">
+                <div className="row g-3 align-items-end">
+                  <div className="col-md-3">
+                    <label className="form-label">Search</label>
+                    <div className="form-control-wrap">
+                      <div className="form-icon form-icon-left">
+                        <Search size={16} />
+                      </div>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="Title, tags, description..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="col-md-2">
+                    <label className="form-label">Status</label>
+                    <select
+                      className="form-select"
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                    >
+                      <option value="all">All</option>
+                      <option value="draft">Draft</option>
+                      <option value="published">Published</option>
+                    </select>
+                  </div>
+
+                  <div className="col-md-2">
+                    <label className="form-label">
+                      Track / Category{" "}
+                    </label>
+                    <select
+                      className="form-select"
+                      value={categoryFilter}
+                      onChange={(e) => setCategoryFilter(e.target.value)}
+                    >
+                      <option value="all">All</option>
+                      <option value="FOUNDATION">FOUNDATION</option>
+                      <option value="FULL">FULL</option>
+                      <option value="EXAM">EXAM</option>
+                      {distinctCategories
+                        .filter(
+                          (c) => !["FOUNDATION", "FULL", "EXAM"].includes(c)
+                        )
+                        .map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+
+                  <div className="col-md-2">
+                    <label className="form-label">Level</label>
+                    <select
+                      className="form-select"
+                      value={levelFilter}
+                      onChange={(e) => setLevelFilter(e.target.value)}
+                    >
+                      <option value="all">All</option>
+                      <option value="beginner">Beginner</option>
+                      <option value="intermediate">Intermediate</option>
+                      <option value="advanced">Advanced</option>
+                      {distinctLevels
+                        .filter(
+                          (l) =>
+                            !["beginner", "intermediate", "advanced"].includes(l)
+                        )
+                        .map((l) => (
+                          <option key={l} value={l}>
+                            {l}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+
+                  <div className="col-md-3">
+                    <label className="form-label">
+                      Tag filter{" "}
+                      <span className="text-soft small">(e.g. fswd, foundation)</span>
+                    </label>
+                    <div className="form-control-wrap">
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={tagFilter}
+                        onChange={(e) => setTagFilter(e.target.value)}
+                        placeholder="Tag name"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* LIST CARD (older markup + newer list columns/actions) */}
             <div className="nk-tb-list is-separate mb-3">
               {/* HEAD */}
               <div className="nk-tb-item nk-tb-head">
@@ -301,32 +467,24 @@ const CoursesList = () => {
                   <span className="sub-text">Courses by</span>
                 </div>
 
-                {/* Lessons planned */}
                 <div className="nk-tb-col tb-col-lg">
                   <span className="sub-text">Lessons Planned</span>
                 </div>
 
-                {/* Status */}
                 <div className="nk-tb-col tb-col-md">
                   <span className="sub-text">Status</span>
                 </div>
 
-                {/* Approval */}
-                <div className="nk-tb-col tb-col-md">
-                  <span className="sub-text">Approval</span>
-                </div>
+                {/* Removed Approval column per request */}
 
-                {/* Price */}
                 <div className="nk-tb-col tb-col-mb">
                   <span className="sub-text">Price</span>
                 </div>
 
-                {/* Created */}
                 <div className="nk-tb-col tb-col-lg">
                   <span className="sub-text">Created</span>
                 </div>
 
-                {/* Actions */}
                 <div className="nk-tb-col nk-tb-col-tools">
                   <span className="sub-text">Actions</span>
                 </div>
@@ -371,7 +529,8 @@ const CoursesList = () => {
                   const lessons =
                     course.totalLessonsPlanned ??
                     course.lessonsCount ??
-                    "-";
+                    course.totalLessons ??
+                    0;
                   const createdAt = formatDate(course.createdAt);
 
                   const priceLabel = getPriceLabel(course);
@@ -385,7 +544,7 @@ const CoursesList = () => {
                   return (
                     <div
                       className="nk-tb-item"
-                      key={id}
+                      key={id || course.title}
                       style={{ cursor: "pointer" }}
                       onClick={handleRowClick}
                     >
@@ -430,9 +589,7 @@ const CoursesList = () => {
 
                       {/* Level */}
                       <div className="nk-tb-col tb-col-mb">
-                        <span className="tb-amount text-capitalize">
-                          {level}
-                        </span>
+                        <span className="tb-amount text-capitalize">{level}</span>
                       </div>
 
                       {/* Instructor */}
@@ -442,30 +599,17 @@ const CoursesList = () => {
 
                       {/* Lessons planned */}
                       <div className="nk-tb-col tb-col-lg">
-                        <span>
-                          {lessons === "-" ? "-" : `${lessons}`}
-                        </span>
+                        <span>{lessons === "-" ? "-" : `${lessons}`}</span>
                       </div>
 
                       {/* Status */}
                       <div className="nk-tb-col tb-col-md">
-                        <span
-                          className={`badge ${getStatusBadgeClass(status)}`}
-                        >
+                        <span className={`badge ${getStatusBadgeClass(status)}`}>
                           {status}
                         </span>
                       </div>
 
-                      {/* Approval */}
-                      <div className="nk-tb-col tb-col-md">
-                        <span
-                          className={`badge ${getApprovalBadgeClass(
-                            approvalLabel
-                          )}`}
-                        >
-                          {approvalLabel}
-                        </span>
-                      </div>
+                      {/* Approval column removed from rows */}
 
                       {/* Price */}
                       <div className="nk-tb-col tb-col-mb">
@@ -509,9 +653,7 @@ const CoursesList = () => {
                                   type="button"
                                   className="dropdown-item"
                                   onClick={() =>
-                                    navigate(
-                                      `/admin/courses/${id}/curriculum`
-                                    )
+                                    navigate(`/admin/courses/${id}/curriculum`)
                                   }
                                 >
                                   <FiEdit className="icon me-1" />
@@ -523,9 +665,46 @@ const CoursesList = () => {
                                   type="button"
                                   className="dropdown-item text-danger"
                                   onClick={() => handleDeleteCourse(id)}
+                                  disabled={actionLoadingId === id}
                                 >
                                   <FiTrash2 className="icon me-1" />
-                                  <span>Delete Course</span>
+                                  <span>
+                                    {actionLoadingId === id
+                                      ? "Deleting..."
+                                      : "Delete Course"}
+                                  </span>
+                                </button>
+                              </li>
+
+                              <li className="dropdown-divider" />
+                              <li>
+                                <button
+                                  type="button"
+                                  className="dropdown-item"
+                                  onClick={() => handleCreateBatch(course, "online")}
+                                >
+                                  <PlayCircle size={14} className="me-1" />
+                                  <span>Create Online Batch</span>
+                                </button>
+                              </li>
+                              <li>
+                                <button
+                                  type="button"
+                                  className="dropdown-item"
+                                  onClick={() => handleCreateBatch(course, "offline")}
+                                >
+                                  <Layers3 size={14} className="me-1" />
+                                  <span>Create Offline Batch</span>
+                                </button>
+                              </li>
+                              <li>
+                                <button
+                                  type="button"
+                                  className="dropdown-item"
+                                  onClick={() => handleCreateBatch(course, "hybrid")}
+                                >
+                                  <Layers3 size={14} className="me-1" />
+                                  <span>Create Hybrid Batch</span>
                                 </button>
                               </li>
                             </ul>
@@ -537,7 +716,7 @@ const CoursesList = () => {
                 })}
             </div>
 
-            {/* PAGINATION */}
+            {/* PAGINATION (older style, newer pagination state preserved) */}
             <div className="card">
               <div className="card-inner">
                 <div className="nk-block-between-md g-3">
@@ -551,17 +730,14 @@ const CoursesList = () => {
                         <button
                           className="page-link"
                           type="button"
-                          onClick={() =>
-                            handleChangePage(pagination.page - 1)
-                          }
+                          onClick={() => handleChangePage(pagination.page - 1)}
                         >
                           Prev
                         </button>
                       </li>
                       <li className="page-item">
                         <span className="page-link">
-                          Page {pagination.page} of{" "}
-                          {pagination.totalPages || 1}
+                          Page {pagination.page} of {pagination.totalPages || 1}
                         </span>
                       </li>
                       <li
@@ -574,9 +750,7 @@ const CoursesList = () => {
                         <button
                           className="page-link"
                           type="button"
-                          onClick={() =>
-                            handleChangePage(pagination.page + 1)
-                          }
+                          onClick={() => handleChangePage(pagination.page + 1)}
                         >
                           Next
                         </button>
@@ -595,9 +769,7 @@ const CoursesList = () => {
                           className="form-control"
                           value={pagination.page}
                           onChange={(e) =>
-                            handleChangePage(
-                              Number(e.target.value) || 1
-                            )
+                            handleChangePage(Number(e.target.value) || 1)
                           }
                           style={{ width: "80px" }}
                         />
