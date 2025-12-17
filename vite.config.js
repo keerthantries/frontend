@@ -14,8 +14,10 @@ export default defineConfig({
     allowedHosts: [
       'frontend-ljg7.onrender.com',
       'admin.vidhyapat.com',
+      'frontend-csp9.onrender.com',
       // add any other domains you will use (custom domain, etc.)
     ],
   },
 })
+
 
